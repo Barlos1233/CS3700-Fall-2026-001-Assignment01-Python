@@ -1,0 +1,83 @@
+name: A0 Python Service Discovery Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Pyro5 and testing tools
+      run: |
+        pip install Pyro5==5.17 flake8 pytest pytest-cov
+
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings; modify as needed
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      continue-on-error: true
+
+    - name: Run pytest with coverage (if tests exist)
+      run: |
+        if [ -d "tests" ]; then
+          pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=html
+        elif [ -f "test_*.py" ] || [ -f "*_test.py" ]; then
+          pytest . -v --ignore=__pycache__ --cov=. --cov-report=term-missing --cov-report=html
+        else
+          echo "No tests found (pytest skipped)"
+        fi
+      continue-on-error: true
+
+    - name: Upload coverage report (if available)
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-a0-coverage
+        path: htmlcov/
+      continue-on-error: true
+
+    - name: Start Pyro5 name server
+      run: |
+        python -m Pyro5.nameserver &
+        sleep 2
+
+    - name: Run service discovery client (grading hook)
+      run: |
+        python service_discovery_client.py
+      timeout-minutes: 1
+
+    - name: Test output format matches pyro5-nsc
+      run: |
+        output=$(python service_discovery_client.py)
+        expected=$(python -m Pyro5.nsc list)
+        if [[ "$output" == "$expected" ]]; then
+          echo "✓ Service discovery output matches pyro5-nsc list"
+          exit 0
+        else
+          echo "✗ Service discovery output does not match pyro5-nsc list"
+          echo "Expected:"
+          echo "$expected"
+          echo ""
+          echo "Got:"
+          echo "$output"
+          exit 1
+        fi
+      timeout-minutes: 1
+
+    - name: Clean up
+      if: always()
+      run: |
+        pkill -f "Pyro5.nameserver" || true
