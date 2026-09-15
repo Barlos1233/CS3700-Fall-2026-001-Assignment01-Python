@@ -1,6 +1,6 @@
 # Pyro5 Protocol — Service Discovery
 
-## Your name
+## Carlos Viramontes
 
 ## Your student number
 

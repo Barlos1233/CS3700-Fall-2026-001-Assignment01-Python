@@ -4,10 +4,10 @@ import serpent
 MAGIC = b'PYRO'
 VERSION = 502    # Pyro5 protocal version 
 MSG_CONNECT = 1
-MSG_INVOKE = 2    
+MSG_INVOKE = 4    
 SERIALIZER_SERPENT = 1      # serializer id for serpent
 
-HEADER_FORMAT = '>4sIII' # magic, version, flags, serializer id
+HEADER_FORMAT = '>4sHBBHHII16sHH' # magic, version, flags, serializer id
 # size I = 4 more bytes 
 
 def build_header(msg_type, data_length, flags=0, seq=0, serializer=SERIALIZER_SERPENT, annotations_len=0, correlation_id=b'\x00'*16):
@@ -21,9 +21,7 @@ def build_header(msg_type, data_length, flags=0, seq=0, serializer=SERIALIZER_SE
     return header
 
 def build_list_request(prefix=""):
-    """
-    Build a Pyro5 list request message.
-    """
+    
    # build the serpent-serialized payload
    
     call = ("Pyro.NameServer", "list_prefix", (prefix,), {})
@@ -34,3 +32,7 @@ def build_list_request(prefix=""):
    
    # concatenate header and payload
     return header + payload
+
+def send_message(sock, msg):
+    
+    sock.sendall(msg)
